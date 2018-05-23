@@ -159,9 +159,9 @@ object TimeUsage {
     // Hint: you want to create a complex column expression that sums other columns
     //       by using the `+` operator between them
     // Hint: don’t forget to convert the value to hours
-    val primaryNeedsProjection: Column = primaryNeedsColumns.reduce((a, b) => (a+b)/60)
-    val workProjection: Column = workColumns.reduce((a, b) => (a+b)/60)
-    val otherProjection: Column = otherColumns.reduce((a, b) => (a+b)/60)
+    val primaryNeedsProjection: Column = primaryNeedsColumns.reduce((a, b) => a+b).cast(DoubleType) / 60
+    val workProjection: Column = workColumns.reduce((a, b) => a+b).cast(DoubleType) / 60
+    val otherProjection: Column = otherColumns.reduce((a, b) => a+b).cast(DoubleType) / 60
     df
       .select(workingStatusProjection, sexProjection, ageProjection, primaryNeedsProjection, workProjection, otherProjection)
       .where($"telfs" <= 4) // Discard people who are not in labor force
