@@ -93,14 +93,15 @@ object TimeUsage {
     */
   def classifiedColumns(columnNames: List[String]): (List[Column], List[Column], List[Column]) = {
     val primari_needs = columnNames.filter(columnName => columnName.startsWith("t01 || t03 || t11 || t1801 || t1803"))
-                                   .map(columnName => new Column(columnName))
+      .map(columnName => new Column(columnName))
     val working_activities = columnNames.filter(columnName => columnName.startsWith("t05 || t1805"))
-                                        .map(columnName => new Column(columnName))
+      .map(columnName => new Column(columnName))
     val other_ctivities = columnNames.filter(columnName => columnName.startsWith("t02 || t04 || t06 || t07 || t08 || " +
       "t09 || t10 || t12 || t13 || t14 || t15 || t16 || t18") && !columnName.startsWith("t1803 || t1801 || t1805"))
-                                     .map(columnName => new Column(columnName))
+      .map(columnName => new Column(columnName))
 
     (primari_needs, working_activities, other_ctivities)
+  }
 
   /** @return a projection of the initial DataFrame such that all columns containing hours spent on primary needs
     *         are summed together in a single column (and same for work and leisure). The “teage” column is also
@@ -142,17 +143,21 @@ object TimeUsage {
     // more sense for our use case
     // Hint: you can use the `when` and `otherwise` Spark functions
     // Hint: don’t forget to give your columns the expected name with the `as` method
-    val workingStatusProjection: Column = ???
-    val sexProjection: Column = ???
-    val ageProjection: Column = ???
+    val workingStatusProjection: Column = when($"telfs".lt(3) or $"telfs".geq(1), "working")
+                                          .otherwise("not_working").as("working")
+    val sexProjection: Column = when($"telfs".equalTo(1), "male")
+                                .otherwise("female").as("sex")
+    val ageProjection: Column = when($"telfs".leq(22) or $"telfs".geq(15), "young")
+                                .when($"telfs".leq(55) or $"telfs".geq(23), "active")
+                                .otherwise("elder").as("age")
 
     // Create columns that sum columns of the initial dataset
     // Hint: you want to create a complex column expression that sums other columns
     //       by using the `+` operator between them
     // Hint: don’t forget to convert the value to hours
-    val primaryNeedsProjection: Column = ???
-    val workProjection: Column = ???
-    val otherProjection: Column = ???
+    val primaryNeedsProjection: Column = primaryNeedsColumns.reduce((a, b) => (a+b)/60)
+    val workProjection: Column = workColumns.reduce((a, b) => (a+b)/60)
+    val otherProjection: Column = otherColumns.reduce((a, b) => (a+b)/60)
     df
       .select(workingStatusProjection, sexProjection, ageProjection, primaryNeedsProjection, workProjection, otherProjection)
       .where($"telfs" <= 4) // Discard people who are not in labor force
@@ -176,7 +181,11 @@ object TimeUsage {
     * Finally, the resulting DataFrame should be sorted by working status, sex and age.
     */
   def timeUsageGrouped(summed: DataFrame): DataFrame = {
-    ???
+    summed.groupBy("working", "sex", "age")
+          .agg(round(avg("primaryNeeds"),1),
+               round(avg("work"),1),
+               round(avg("other"),1))
+          .orderBy('working, 'sex, 'age)
   }
 
   /**
@@ -193,7 +202,8 @@ object TimeUsage {
     * @param viewName Name of the SQL view to use
     */
   def timeUsageGroupedSqlQuery(viewName: String): String =
-    ???
+    "select working, sex, age, ROUND(AVG(primaryNeeds),1) as primaryNeeds, ROUND(AVG(work),1) as work, ROUND(AVG(other),1) as other " +
+    "FROM " + viewName + " GROUP BY working, sex, age ORDER BY working, sex, age"
 
   /**
     * @return A `Dataset[TimeUsageRow]` from the “untyped” `DataFrame`
