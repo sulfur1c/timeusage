@@ -92,12 +92,16 @@ object TimeUsage {
     *    “t10”, “t12”, “t13”, “t14”, “t15”, “t16” and “t18” (those which are not part of the previous groups only).
     */
   def classifiedColumns(columnNames: List[String]): (List[Column], List[Column], List[Column]) = {
-    val primari_needs = columnNames.filter(columnName => columnName.startsWith("t01 || t03 || t11 || t1801 || t1803"))
+    val primari_needs = columnNames.filter(columnName => columnName.startsWith("t01") || columnName.startsWith("t03")
+      || columnName.startsWith("t11") || columnName.startsWith("t1801") || columnName.startsWith("t1803"))
       .map(columnName => new Column(columnName))
-    val working_activities = columnNames.filter(columnName => columnName.startsWith("t05 || t1805"))
+    val working_activities = columnNames.filter(columnName => columnName.startsWith("t05") || columnName.startsWith("t1805"))
       .map(columnName => new Column(columnName))
-    val other_ctivities = columnNames.filter(columnName => columnName.startsWith("t02 || t04 || t06 || t07 || t08 || " +
-      "t09 || t10 || t12 || t13 || t14 || t15 || t16 || t18") && !columnName.startsWith("t1803 || t1801 || t1805"))
+    val other_ctivities = columnNames.filter(columnName => (columnName.startsWith("t02") || columnName.startsWith("t04")
+      || columnName.startsWith("t06") || columnName.startsWith("t07") || columnName.startsWith("t08") || columnName.startsWith("t09")
+      || columnName.startsWith("t10") || columnName.startsWith("t12") || columnName.startsWith("t13") || columnName.startsWith("t14")
+      || columnName.startsWith("t15") || columnName.startsWith("t16") || columnName.startsWith("t18")) && ((!columnName.startsWith("t1803")
+      || !columnName.startsWith("t1801") || !columnName.startsWith("t1805"))))
       .map(columnName => new Column(columnName))
 
     (primari_needs, working_activities, other_ctivities)
