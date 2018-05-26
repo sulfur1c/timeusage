@@ -63,7 +63,7 @@ object TimeUsage {
     * @param columnNames Column names of the DataFrame
     */
   def dfSchema(columnNames: List[String]): StructType = {
-    val columns = columnNames.map(columnName => if (columnName == columnNames.indexOf(0))
+    val columns = columnNames.map(columnName => if (columnName == columnNames.head)
                                                 StructField(columnName, StringType, false)
                                                 else StructField(columnName, DoubleType, false))
     StructType(columns)
@@ -72,8 +72,9 @@ object TimeUsage {
   /** @return An RDD Row compatible with the schema produced by `dfSchema`
     * @param line Raw fields
     */
+
   def row(line: List[String]): Row = {
-    Row(line.foreach(_.toString))
+    Row.fromSeq(line.head :: line.tail.map(_.toDouble))
   }
 
   /** @return The initial data frame columns partitioned in three groups: primary needs (sleeping, eating, etc.),
@@ -101,7 +102,7 @@ object TimeUsage {
       || columnName.startsWith("t06") || columnName.startsWith("t07") || columnName.startsWith("t08") || columnName.startsWith("t09")
       || columnName.startsWith("t10") || columnName.startsWith("t12") || columnName.startsWith("t13") || columnName.startsWith("t14")
       || columnName.startsWith("t15") || columnName.startsWith("t16") || columnName.startsWith("t18")) && ((!columnName.startsWith("t1803")
-      || !columnName.startsWith("t1801") || !columnName.startsWith("t1805"))))
+      && !columnName.startsWith("t1801") && !columnName.startsWith("t1805"))))
       .map(columnName => new Column(columnName))
 
     (primari_needs, working_activities, other_ctivities)
@@ -147,21 +148,21 @@ object TimeUsage {
     // more sense for our use case
     // Hint: you can use the `when` and `otherwise` Spark functions
     // Hint: don’t forget to give your columns the expected name with the `as` method
-    val workingStatusProjection: Column = when($"telfs".lt(3) or $"telfs".geq(1), "working")
-                                          .otherwise("not_working").as("working")
-    val sexProjection: Column = when($"telfs".equalTo(1), "male")
+    val workingStatusProjection: Column = when($"telfs".lt(3) && $"telfs".geq(1), "working")
+                                          .otherwise("not working").as("working")
+    val sexProjection: Column = when($"tesex".equalTo(1), "male")
                                 .otherwise("female").as("sex")
-    val ageProjection: Column = when($"telfs".leq(22) or $"telfs".geq(15), "young")
-                                .when($"telfs".leq(55) or $"telfs".geq(23), "active")
+    val ageProjection: Column = when($"teage".leq(22) && $"teage".geq(15), "young")
+                                .when($"teage".leq(55) && $"teage".geq(23), "active")
                                 .otherwise("elder").as("age")
 
     // Create columns that sum columns of the initial dataset
     // Hint: you want to create a complex column expression that sums other columns
     //       by using the `+` operator between them
     // Hint: don’t forget to convert the value to hours
-    val primaryNeedsProjection: Column = primaryNeedsColumns.reduce((a, b) => a+b).cast(DoubleType) / 60
-    val workProjection: Column = workColumns.reduce((a, b) => a+b).cast(DoubleType) / 60
-    val otherProjection: Column = otherColumns.reduce((a, b) => a+b).cast(DoubleType) / 60
+    val primaryNeedsProjection: Column = (primaryNeedsColumns.reduce((a, b) => a+b).cast(DoubleType) / 60).as("primaryNeeds")
+    val workProjection: Column = (workColumns.reduce((a, b) => a+b).cast(DoubleType) / 60).as("work")
+    val otherProjection: Column = (otherColumns.reduce((a, b) => a+b).cast(DoubleType) / 60).as("other")
     df
       .select(workingStatusProjection, sexProjection, ageProjection, primaryNeedsProjection, workProjection, otherProjection)
       .where($"telfs" <= 4) // Discard people who are not in labor force
@@ -185,6 +186,7 @@ object TimeUsage {
     * Finally, the resulting DataFrame should be sorted by working status, sex and age.
     */
   def timeUsageGrouped(summed: DataFrame): DataFrame = {
+    // println(summed.printSchema())
     summed.groupBy("working", "sex", "age")
           .agg(round(avg("primaryNeeds"),1),
                round(avg("work"),1),
